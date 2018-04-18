@@ -7,8 +7,11 @@ class DatabaseModule {
     let username = 'test_user';
     this.url = "mongodb+srv://" + username + ":" + password + "@noyou-4k2c1.mongodb.net/test";
     // defaults
-    this.dbName = "test";
-    this.collectionName = "documents2";
+    this.dbName = "test2";
+    this.collectionName = "documents";
+    
+    this.contractDbName = "test";
+    this.contractCollectionName = "contracts";
   }
 
   _connectDb(callback) {
@@ -29,7 +32,26 @@ class DatabaseModule {
     });
   }
 
-  createUser(username, password, accountId) {
+  _connectContractDb(callback) {
+    var dbName = this.contractDbName;
+    var collectionName = this.contractCollectionName;
+    console.log("Attempting to connect to " + dbName + ":" + collectionName);
+
+    MongoClient.connect(this.url, function(err, client) {
+      assert.equal(null, err);
+
+      const db = client.db(dbName);
+      const collection = db.collection(collectionName);
+
+      console.log("Successfully connected to database");
+      callback(collection);
+      client.close();
+      console.log("Database connection closed");
+    });
+  }
+
+
+  createUser(username, password, accountId, callback) {
     var record = {
       username: username,
       password: password,
@@ -39,6 +61,7 @@ class DatabaseModule {
     this._connectDb(function(collection) {
       collection.insert(record, function(err, result) {
         assert.equal(null, err);
+        callback();
       });
     });
   }
@@ -70,6 +93,27 @@ class DatabaseModule {
         else {
           callback(true);
         }
+      });
+    });
+  }
+
+  contractExists(callback) {
+    this._connectContractDb(function(collection) {
+      collection.find({}).toArray(function(err, docs) {
+        if (err != null || docs === undefined || docs.length == 0) {
+          callback(false);
+        }
+        else {
+          callback(true);
+        }
+      });
+    });
+  }
+
+  fetchContractAddress(callback) {
+    this._connectContractDb(function(collection) {
+      collection.find({}).toArray(function(err, docs) {
+        callback(docs[0].contract);
       });
     });
   }

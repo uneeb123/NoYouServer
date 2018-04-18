@@ -1,21 +1,66 @@
 var DatabaseModule = require('./db_module');
+var BlockchainModule = require('./blockchain_module');
+var randomstring = require("randomstring");
+
 var db = new DatabaseModule();
 
-function createUser(username, password, accountId, callback) {
-  db.userExists(username, function(exists) {
-    if (!exists) {
-      db.createUser(username, password, accountId);
-      callback({result: 'ok'});
-    }
-    else {
-      callback({errors: 'user_exists'});
-    }
-  }); 
+var blockchain = null;
+db.fetchContractAddress((contractAddress) => {
+  blockchain = new BlockchainModule(contractAddress);
+});
+
+function createUser(username, callback) {
+  if (username == 'god') {
+    db.userExists(username, function(exists) {
+      if (!exists) {
+        password = randomstring.generate(8); 
+        blockchain.getGodAccount((addr) => {
+          db.createUser(username, password, addr, function() {
+            callback({result: 'ok'});
+          });
+        });
+      }
+      else {
+        callback({error: 'user_exists'});
+      }
+    }); 
+  }
+  else {
+    db.userExists(username, function(exists) {
+      if (!exists) {
+        password = randomstring.generate(8); 
+        blockchain.createAccount(password, (addr) => {
+          db.createUser(username, password, addr, function() {
+            callback({result: 'ok'});
+          });
+        });
+      }
+      else {
+        callback({error: 'user_exists'});
+      }
+    }); 
+  }
 }
 
 function getAllUsers(callback) {
   db.getAllUsers(function(response) {
-    callback(response);
+    var result = [];
+    var itemsProcessed = 0;
+    console.log(response);
+    if (response === undefined || response.length == 0) {
+      callback(result);
+    }
+    response.forEach((user, index, array) => {
+      addr = user.accountId;
+      blockchain.getBalance(addr, (balance) => {
+        user.balance = balance;
+        result.push(user);
+        itemsProcessed++;
+        if(itemsProcessed === array.length) {
+          callback(result);
+        }
+      });
+    });
   });
 }
 
@@ -23,7 +68,12 @@ function getUser(username, callback) {
   db.userExists(username, function(exists) {
     if (exists) {
       db.getUser(username, function(response) {
-        callback(response);
+        console.log(response);
+        addr = response.accountId;
+        blockchain.getBalance(addr, (balance) => {
+          response.balance = balance;
+          callback(response);
+        });
       });
     }
     else {
@@ -32,7 +82,32 @@ function getUser(username, callback) {
   });
 }
 
-// createUser('testuser1','testpass1','1');
+function contractExists(callback) {
+  db.contractExists((exists) => {
+    callback(exists);
+  })
+}
+
+function sendTokens(from_user, to_user, callback) {
+  getUser(from_user, (result) => {
+    if (result.error) {
+      return callback(result);
+    }
+    from_addr = result.accountId;
+    from_pass = result.password;
+    getUser(to_user, (result2) => {
+      if (result2.error) {
+        return callback(result2);
+      }
+      to_addr = result2.accountId;
+      blockchain.send(from_addr, from_pass, to_addr, function() {
+        getUser(from_user, function(new_result) {
+          callback(new_result);
+        });
+      });
+    });
+  });
+}
 
 const express = require('express')
 const app = express()
@@ -45,30 +120,47 @@ app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
 }));
 
 app.get('/', (request, response) => {
-  getAllUsers((result) => {
-    response.send(result);
-  });
+  try {
+    getAllUsers((result) => {
+      response.send(result);
+    });
+  } catch(error) {
+    response.send({error: 'unknown'});
+  }
 })
 
 app.post('/create', (request, response) => {
   username = request.body.username;
-  password = 'testpass';
-  accountId = 'testaccount';
-  createUser(username, password, accountId, function(result) {
+  try {
+  createUser(username, function(result) {
     response.send(result);
   }); 
+  } catch(error) {
+    response.send({error: 'unknown'});
+  }
 });
 
 app.get('/user/:username', (request, response) => {
   username = request.params.username;
-  getUser(username, function(result) {
-    response.send(result);
-  });
+  try {
+    getUser(username, function(result) {
+      response.send(result);
+    });
+  } catch(error) {
+    response.send({error: 'unknown'});
+  }
 });
 
-app.post('/send/:to_addr', (request, response) => {
-  to_addr = request.params.to_addr;
-  from_addr = request.body.from_addr;
+app.post('/send/:to_user', (request, response) => {
+  to_user = request.params.to_user;
+  from_user = request.body.from_user;
+  try {
+    sendTokens(from_user, to_user, function(result) {
+      response.send(result);
+    });
+  } catch (error) {
+    response.send({error: 'unknown'});
+  }
 });
 
 
@@ -76,6 +168,11 @@ app.listen(port, (err) => {
   if (err) {
     return console.log('something bad happened', err)
   }
+  contractExists((exists) => {
+    if (!exists) {
+      return console.log('deploy contract first');
+    }
+  });
 
   console.log(`server is listening on ${port}`)
 })
