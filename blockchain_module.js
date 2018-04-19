@@ -28,6 +28,7 @@ class BlockchainModule {
 
   getBalance(address, callback) {
     this.contract.methods.getBalance().call({from: address}, function(error, result){
+      console.log("balance: " + result);
       callback(result);
     });
   }
@@ -38,22 +39,12 @@ class BlockchainModule {
     });
   }
 
+  // Only scales to 1000 users
   getBenefactorAccount(callback) {
     var sent = false
     web3.eth.getAccounts().then((response) => {
-      for (var i = 1; i < 10; i++) {
-        addr = response[i];
-        web3.eth.getBalance(addr).then((b) => {
-          console.log("Benefactor: " + addr + " has balance " + b);
-          if (parseInt(b) > web3.utils.toWei('1', "ether")) {
-            console.log("Benefactor chosen " + addr);
-            if (!sent) {
-              callback(addr);
-              sent = true;
-            }
-          }
-        });
-      }
+      console.log("benefactor :" + response[1]);
+      callback(response[1]);
     });
   }
 
@@ -64,7 +55,7 @@ class BlockchainModule {
       this.contract.methods.bless(to).send({from: from}, function(error, transactionHash){
         console.log(error);
         console.log("blessing went through..." + transactionHash);
-        callback();
+        callback(error);
       });
     }).catch((error) => {
       console.log(error);

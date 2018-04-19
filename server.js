@@ -10,7 +10,10 @@ db.fetchContractAddress((contractAddress) => {
 });
 
 function createUser(username, callback) {
-  if (username == 'god') {
+  if (!username) {
+    callback({error: 'user_null'});
+  }
+  else if (username == 'god') {
     db.userExists(username, function(exists) {
       if (!exists) {
         password = randomstring.generate(8); 
@@ -46,7 +49,6 @@ function getAllUsers(callback) {
   db.getAllUsers(function(response) {
     var result = [];
     var itemsProcessed = 0;
-    console.log(response);
     if (response === undefined || response.length == 0) {
       callback(result);
     }
@@ -68,7 +70,6 @@ function getUser(username, callback) {
   db.userExists(username, function(exists) {
     if (exists) {
       db.getUser(username, function(response) {
-        console.log(response);
         addr = response.accountId;
         blockchain.getBalance(addr, (balance) => {
           response.balance = balance;
@@ -90,21 +91,20 @@ function contractExists(callback) {
 
 function sendTokens(from_user, to_user, callback) {
   getUser(from_user, (result) => {
-    if (result.error) {
-      return callback(result);
-    }
     from_addr = result.accountId;
     from_pass = result.password;
     getUser(to_user, (result2) => {
-      if (result2.error) {
-        return callback(result2);
-      }
       to_addr = result2.accountId;
-      blockchain.send(from_addr, from_pass, to_addr, function() {
-        getUser(from_user, function(new_result) {
-          callback(new_result);
+      if (!from_addr || !to_addr) {
+        callback(1, null);
+      }
+      else {
+        blockchain.send(from_addr, from_pass, to_addr, function(error) {
+          getUser(from_user, function(new_result) {
+            callback(error, new_result);
+          });
         });
-      });
+      }
     });
   });
 }
@@ -154,9 +154,14 @@ app.get('/user/:username', (request, response) => {
 app.post('/send/:to_user', (request, response) => {
   to_user = request.params.to_user;
   from_user = request.body.from_user;
+  console.log(request.body);
   try {
-    sendTokens(from_user, to_user, function(result) {
-      response.send(result);
+    sendTokens(from_user, to_user, function(error, result) {
+      if (error) {
+        response.send({error: 'unsuccessful'});
+      } else {
+        response.send(result);
+      }
     });
   } catch (error) {
     response.send({error: 'unknown'});

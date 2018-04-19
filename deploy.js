@@ -51,7 +51,7 @@ web3.eth.getAccounts().then((allAccounts) => {
     password = "v1LpAdxullM8Z8gY";
     username = 'test_user';
     url = "mongodb+srv://" + username + ":" + password + "@noyou-4k2c1.mongodb.net/test";
-    dbName = "test";
+    dbName = "test6";
     collectionName = "contracts";
 
     console.log("Attempting to connect to " + dbName + ":" + collectionName);

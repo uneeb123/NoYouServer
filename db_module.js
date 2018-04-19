@@ -7,10 +7,10 @@ class DatabaseModule {
     let username = 'test_user';
     this.url = "mongodb+srv://" + username + ":" + password + "@noyou-4k2c1.mongodb.net/test";
     // defaults
-    this.dbName = "test2";
+    this.dbName = "test6";
     this.collectionName = "documents";
     
-    this.contractDbName = "test";
+    this.contractDbName = "test6";
     this.contractCollectionName = "contracts";
   }
 
@@ -87,6 +87,7 @@ class DatabaseModule {
   userExists(username, callback) {
     this._connectDb(function(collection) {
       collection.find({username: username}).toArray(function(err, docs) {
+        console.log(docs);
         if (err != null || docs === undefined || docs.length == 0) {
           callback(false);
         }
